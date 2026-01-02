@@ -6,13 +6,30 @@
 
     <parent>
         <groupId>com.confiance</groupId>
-        <artifactId>confiance-backend</artifactId>
+        <artifactId>confiance-parent</artifactId>
         <version>1.0.0</version>
     </parent>
 
     <artifactId>notification-service</artifactId>
     <name>Notification Service</name>
     <description>Email and Notification Service</description>
+
+    <repositories>
+        <repository>
+            <id>github-parent</id>
+            <url>https://maven.pkg.github.com/confiance-platform/confiance-parent</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+        <repository>
+            <id>github-common</id>
+            <url>https://maven.pkg.github.com/confiance-platform/confiance-common-lib</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
