@@ -4,31 +4,121 @@ server:
 spring:
   application:
     name: notification-service
+
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/confiance_notifications?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  # Redis Configuration for OTP Storage
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:}
+      timeout: 60000
+
+  # Email Configuration (SMTP - Default Provider)
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME:your-email@gmail.com}
-    password: ${MAIL_PASSWORD:your-password}
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:gamefever92@gmail.com}
+    password: ${MAIL_PASSWORD:ixiyuivfinqwxigg}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+    default-encoding: UTF-8
+
+  # Thymeleaf for Email Templates
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    cache: false
 
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka/
     register-with-eureka: true
     fetch-registry: true
   instance:
     prefer-ip-address: true
 
 jwt:
-  secret: confianceSecretKeyForJWTTokenGenerationAndValidation2024
-  expiration: 86400000
+  secret: ${JWT_SECRET:confianceSecretKeyForJWTTokenGenerationAndValidation2024}
+  expiration: ${JWT_EXPIRATION:86400000}
   refresh-expiration: 604800000
+
+# Email Provider Configuration
+email:
+  provider: ${EMAIL_PROVIDER:smtp}  # Options: smtp, sendgrid, aws-ses
+  from:
+    address: ${EMAIL_FROM_ADDRESS:noreply@confiance.com}
+    name: ${EMAIL_FROM_NAME:Confiance Financial}
+
+# SendGrid Configuration (Alternative Email Provider)
+sendgrid:
+  api-key: ${SENDGRID_API_KEY:}
+
+# AWS SES Configuration (Alternative Email Provider)
+aws:
+  ses:
+    region: ${AWS_SES_REGION:ap-south-1}
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
+
+# OTP/SMS Provider Configuration
+otp:
+  provider: ${OTP_PROVIDER:twilio}  # Options: twilio, aws-sns, msg91
+  length: 6
+  expiry-minutes: 5
+  max-attempts: 3
+
+# Twilio Configuration (Default SMS/OTP Provider)
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:ACa2c3f651cf8de859e9a44ec0a15510fb}
+  auth-token: ${TWILIO_AUTH_TOKEN:eecbd2e3b13eb32fba416aad92c5e930}
+  phone-number: ${TWILIO_PHONE_NUMBER:+19786256716}
+  verify-service-sid: ${TWILIO_VERIFY_SERVICE_SID:VAaf9d9c7364f030c50dc488cd09da2301}
+
+# Cloudinary Configuration (File/Image Upload)
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:dh187xay8}
+  api-key: ${CLOUDINARY_API_KEY:864234417535938}
+  api-secret: ${CLOUDINARY_API_SECRET:1TFTmwigme8AMTRVM5FGuI2yc5M}
+  folder: ${CLOUDINARY_FOLDER:confiance}
+  max-file-size: 10485760  # 10MB
+
+# Razorpay Configuration (Payment Gateway)
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_test_S4gvc2ax50znlu}
+  key-secret: ${RAZORPAY_KEY_SECRET:gj3Z6Dys2asstLOW2ce5Ht0G}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:buQjuv-9pydpi-xyddoc}
+  currency: ${RAZORPAY_CURRENCY:INR}
 
 management:
   endpoints:
@@ -48,5 +138,45 @@ springdoc:
 logging:
   level:
     com.confiance.notification: DEBUG
+    com.twilio: INFO
+    com.cloudinary: INFO
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Rate Limiting Configuration
+rate-limit:
+  enabled: true
+  # OTP Rate Limits
+  otp:
+    cooldown-seconds: 60              # Minimum time between OTP sends
+    max-per-minute: 2                  # Max OTP sends per minute
+    max-per-hour: 10                   # Max OTP sends per hour
+    max-per-day: 20                    # Max OTP sends per day
+    max-verify-attempts: 5             # Max verification attempts per OTP
+
+  # Payment Rate Limits
+  payment:
+    max-create-per-minute: 5           # Max payment orders per minute
+    max-create-per-hour: 30            # Max payment orders per hour
+    max-verify-per-minute: 10          # Max payment verifications per minute
+
+  # File Upload Rate Limits
+  file:
+    max-uploads-per-minute: 10         # Max file uploads per minute
+    max-uploads-per-hour: 50           # Max file uploads per hour
+
+  # Email Rate Limits
+  email:
+    max-per-minute: 5                  # Max emails per minute
+    max-per-hour: 50                   # Max emails per hour
+
+  # Global API Rate Limits (per IP)
+  api:
+    requests-per-second: 10            # Max API requests per second
+    burst-capacity: 20                 # Burst capacity
+
+  # IP Blocking Configuration
+  ip-blocking:
+    enabled: true
+    max-failed-attempts: 10            # Max failed attempts before blocking
+    block-duration-minutes: 30         # Block duration in minutes
