@@ -40,7 +40,7 @@ spring:
     host: ${MAIL_HOST:smtp.gmail.com}
     port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:gamefever92@gmail.com}
-    password: ${MAIL_PASSWORD:ixiyuivfinqwxigg}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -100,24 +100,24 @@ otp:
 
 # Twilio Configuration (Default SMS/OTP Provider)
 twilio:
-  account-sid: ${TWILIO_ACCOUNT_SID:ACa2c3f651cf8de859e9a44ec0a15510fb}
-  auth-token: ${TWILIO_AUTH_TOKEN:eecbd2e3b13eb32fba416aad92c5e930}
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
   phone-number: ${TWILIO_PHONE_NUMBER:+19786256716}
-  verify-service-sid: ${TWILIO_VERIFY_SERVICE_SID:VAaf9d9c7364f030c50dc488cd09da2301}
+  verify-service-sid: ${TWILIO_VERIFY_SERVICE_SID:}
 
 # Cloudinary Configuration (File/Image Upload)
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:dh187xay8}
-  api-key: ${CLOUDINARY_API_KEY:864234417535938}
-  api-secret: ${CLOUDINARY_API_SECRET:1TFTmwigme8AMTRVM5FGuI2yc5M}
+  api-key: ${CLOUDINARY_API_KEY:}
+  api-secret: ${CLOUDINARY_API_SECRET:}
   folder: ${CLOUDINARY_FOLDER:confiance}
   max-file-size: 10485760  # 10MB
 
 # Razorpay Configuration (Payment Gateway)
 razorpay:
-  key-id: ${RAZORPAY_KEY_ID:rzp_test_S4gvc2ax50znlu}
-  key-secret: ${RAZORPAY_KEY_SECRET:gj3Z6Dys2asstLOW2ce5Ht0G}
-  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:buQjuv-9pydpi-xyddoc}
+  key-id: ${RAZORPAY_KEY_ID:}
+  key-secret: ${RAZORPAY_KEY_SECRET:}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
   currency: ${RAZORPAY_CURRENCY:INR}
 
 management:
