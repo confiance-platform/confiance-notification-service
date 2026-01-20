@@ -34,7 +34,10 @@ public class SecurityConfig {
                                 "/api-docs/**",
                                 "/actuator/**",
                                 "/api/v1/payments/webhook",
-                                "/api/v1/otp/**"
+                                "/api/v1/otp/**",
+                                "/api/v1/notifications/**",
+                                "/api/v1/email-templates/**",
+                                "/api/v1/features/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

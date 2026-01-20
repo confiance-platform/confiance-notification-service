@@ -46,16 +46,19 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
     private final EmailService emailService;
+    private final FeatureService featureService;
 
     @Autowired
     public PaymentService(@Autowired(required = false) RazorpayClient razorpayClient,
                           PaymentRepository paymentRepository,
                           ObjectMapper objectMapper,
-                          EmailService emailService) {
+                          EmailService emailService,
+                          FeatureService featureService) {
         this.razorpayClient = razorpayClient;
         this.paymentRepository = paymentRepository;
         this.objectMapper = objectMapper;
         this.emailService = emailService;
+        this.featureService = featureService;
     }
 
     @Value("${razorpay.key-id:}")
@@ -69,6 +72,12 @@ public class PaymentService {
 
     @Transactional
     public PaymentOrderResponse createOrder(PaymentOrderRequest request) {
+        // Check if PAYMENT feature is enabled
+        if (!featureService.isEnabled(FeatureService.FEATURE_PAYMENT)) {
+            log.warn("Payment feature is DISABLED - cannot create order");
+            throw new BadRequestException("Payment service is temporarily disabled. Please try again later.");
+        }
+
         if (razorpayClient == null) {
             throw new InternalServerException("Payment gateway is not configured");
         }

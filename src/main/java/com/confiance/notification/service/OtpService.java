@@ -34,6 +34,7 @@ public class OtpService {
     private final Map<OtpProvider, OtpSender> otpSenders;
     private final OtpLogRepository otpLogRepository;
     private final RedisTemplate<String, String> redisTemplate;
+    private final FeatureService featureService;
 
     @Value("${otp.provider:twilio}")
     private String defaultProvider;
@@ -49,17 +50,34 @@ public class OtpService {
 
     @Autowired
     public OtpService(List<OtpSender> senders, OtpLogRepository otpLogRepository,
-                      RedisTemplate<String, String> redisTemplate) {
+                      RedisTemplate<String, String> redisTemplate, FeatureService featureService) {
         this.otpSenders = senders.stream()
                 .collect(Collectors.toMap(OtpSender::getProvider, sender -> sender));
         this.otpLogRepository = otpLogRepository;
         this.redisTemplate = redisTemplate;
+        this.featureService = featureService;
         log.info("OTP service initialized with providers: {}", otpSenders.keySet());
     }
 
     public OtpResponse sendOtp(OtpRequest request) {
         String identifier = request.getIdentifier();
         OtpPurpose purpose = request.getPurpose();
+
+        // Check if OTP feature is enabled
+        if (!featureService.isEnabled(FeatureService.FEATURE_OTP)) {
+            log.warn("OTP feature is DISABLED - skipping OTP for: {}", identifier);
+            return OtpResponse.builder()
+                    .identifier(identifier)
+                    .status("SKIPPED")
+                    .message("OTP service is temporarily disabled")
+                    .build();
+        }
+
+        // Also check SMS feature if OTP is sent via SMS
+        if (!featureService.isEnabled(FeatureService.FEATURE_SMS)) {
+            log.warn("SMS feature is DISABLED - using fallback for OTP: {}", identifier);
+            return sendOtpFallback(request);
+        }
 
         long recentRequests = otpLogRepository.countByIdentifierAndPurposeAndCreatedAtAfter(
                 identifier, purpose, LocalDateTime.now().minusMinutes(1));
