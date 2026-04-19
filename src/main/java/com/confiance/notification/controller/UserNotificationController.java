@@ -30,6 +30,26 @@ public class UserNotificationController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    /**
+     * Create a notification for a single recipient.
+     * Called internally by other services (user-service, portfolio-service, …)
+     * via the {@code Notifier} helper in common-lib.
+     */
+    @PostMapping
+    @Operation(summary = "Create Notification", description = "Create a notification for a user")
+    public ResponseEntity<ApiResponse<UserNotificationResponse>> createNotification(
+            @RequestBody Map<String, Object> body) {
+        Long userId = ((Number) body.get("userId")).longValue();
+        String title   = String.valueOf(body.getOrDefault("title",   ""));
+        String message = String.valueOf(body.getOrDefault("message", ""));
+        String type    = String.valueOf(body.getOrDefault("type",    "INFO"));
+        String actionUrl = body.get("actionUrl") == null ? null : String.valueOf(body.get("actionUrl"));
+        String icon      = body.get("icon")      == null ? null : String.valueOf(body.get("icon"));
+        UserNotificationResponse created =
+                notificationService.createNotificationResponse(userId, title, message, type, actionUrl, icon);
+        return ResponseEntity.ok(ApiResponse.success("Notification created", created));
+    }
+
     @GetMapping("/user/{userId}/unread")
     @Operation(summary = "Get Unread Notifications", description = "Get paginated list of unread notifications")
     public ResponseEntity<ApiResponse<PageResponse<UserNotificationResponse>>> getUnreadNotifications(

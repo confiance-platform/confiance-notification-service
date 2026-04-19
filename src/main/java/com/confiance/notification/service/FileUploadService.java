@@ -16,6 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +45,11 @@ public class FileUploadService {
 
     @Value("${cloudinary.max-file-size:10485760}")
     private long maxFileSize;
+
+    // When Cloudinary isn't configured (no api-key/secret) files are stored
+    // on this path inside the container and served via /api/v1/files/local/{id}.
+    @Value("${app.upload.local-dir:/app/uploads}")
+    private String localUploadDir;
 
     private static final List<String> ALLOWED_IMAGE_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif", "webp", "svg");
     private static final List<String> ALLOWED_DOCUMENT_EXTENSIONS = Arrays.asList("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "csv");
@@ -76,8 +85,10 @@ public class FileUploadService {
 
     private FileUploadResponse uploadToCloudinary(MultipartFile file, Long userId, String folder,
                                                    String resourceType, String entityType, Long entityId) {
+        // Local-disk fallback so the feature works without Cloudinary credentials.
+        // Once CLOUDINARY_API_KEY/SECRET are set in env, this branch is skipped.
         if (cloudinary == null) {
-            throw new InternalServerException("Cloudinary is not configured");
+            return uploadLocal(file, userId, folder, resourceType, entityType, entityId);
         }
 
         try {
@@ -144,6 +155,87 @@ public class FileUploadService {
             log.error("Failed to upload file to Cloudinary: {}", e.getMessage());
             throw new InternalServerException("Failed to upload file: " + e.getMessage());
         }
+    }
+
+    private FileUploadResponse uploadLocal(MultipartFile file, Long userId, String folder,
+                                            String resourceType, String entityType, Long entityId) {
+        try {
+            String effectiveFolder = folder != null ? folder : defaultFolder;
+            String ext = getFileExtension(file.getOriginalFilename());
+            String id = UUID.randomUUID().toString();
+            String publicId = effectiveFolder + "/" + id + (ext.isEmpty() ? "" : "." + ext);
+
+            Path dir = Paths.get(localUploadDir, effectiveFolder);
+            Files.createDirectories(dir);
+            Path dest = dir.resolve(id + (ext.isEmpty() ? "" : "." + ext));
+            try (var in = file.getInputStream()) {
+                Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // Relative URL — the API gateway routes /api/v1/files/** to this service.
+            // Frontend renders it with the API origin prefix.
+            String url = "/api/v1/files/local/" + effectiveFolder + "/" + id
+                    + (ext.isEmpty() ? "" : "." + ext);
+
+            FileType fileType = determineFileType(resourceType, ext);
+
+            FileUpload fileUpload = FileUpload.builder()
+                    .publicId(publicId)
+                    .url(url)
+                    .secureUrl(url)
+                    .originalFileName(file.getOriginalFilename())
+                    .fileName(publicId)
+                    .fileType(fileType)
+                    .format(ext)
+                    .size(file.getSize())
+                    .folder(effectiveFolder)
+                    .userId(userId)
+                    .entityType(entityType)
+                    .entityId(entityId)
+                    .build();
+
+            FileUpload saved = fileUploadRepository.save(fileUpload);
+            log.info("File stored locally (no Cloudinary): {}", dest);
+
+            return FileUploadResponse.builder()
+                    .fileId(saved.getId().toString())
+                    .publicId(publicId)
+                    .url(url)
+                    .secureUrl(url)
+                    .fileName(publicId)
+                    .originalFileName(file.getOriginalFilename())
+                    .fileType(fileType)
+                    .format(ext)
+                    .size(saved.getSize())
+                    .folder(effectiveFolder)
+                    .uploadedAt(saved.getCreatedAt())
+                    .build();
+        } catch (IOException e) {
+            log.error("Local upload failed: {}", e.getMessage());
+            throw new InternalServerException("Failed to store file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the on-disk path for a file previously stored by {@link #uploadLocal},
+     * accepting a relative path that may contain nested folders (e.g. "avatars/2/uuid.png").
+     * Rejects anything that escapes the upload directory.
+     */
+    public Path resolveLocalFileByRelative(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            throw new BadRequestException("Invalid path");
+        }
+        // Normalise separators, reject absolute and .. segments.
+        String cleaned = relativePath.replace('\\', '/');
+        if (cleaned.startsWith("/") || cleaned.contains("..")) {
+            throw new BadRequestException("Invalid path");
+        }
+        Path base = Paths.get(localUploadDir).toAbsolutePath().normalize();
+        Path target = base.resolve(cleaned).toAbsolutePath().normalize();
+        if (!target.startsWith(base)) {
+            throw new BadRequestException("Invalid path");
+        }
+        return target;
     }
 
     public void deleteFile(String publicId) {

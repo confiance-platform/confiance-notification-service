@@ -10,11 +10,23 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 @RestController
@@ -131,6 +143,32 @@ public class FileUploadController {
     public ResponseEntity<ApiResponse<Void>> deleteFile(@PathVariable String publicId) {
         fileUploadService.deleteFile(publicId);
         return ResponseEntity.ok(ApiResponse.success("File deleted successfully", null));
+    }
+
+    /**
+     * Serve files stored on local disk when Cloudinary isn't configured.
+     * URL format: /api/v1/files/local/{any/path/to/file.ext}
+     * Uses a wildcard mapping so folder paths with '/' (e.g. avatars/2/uuid.png)
+     * are accepted as a single relative path.
+     */
+    @GetMapping("/local/**")
+    @Operation(summary = "Serve local file", description = "Serve a locally stored upload (fallback when Cloudinary is not configured)")
+    public ResponseEntity<Resource> serveLocal(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String prefix = "/api/v1/files/local/";
+        int idx = uri.indexOf(prefix);
+        if (idx < 0) return ResponseEntity.notFound().build();
+        String relative = uri.substring(idx + prefix.length());
+        Path path = fileUploadService.resolveLocalFileByRelative(relative);
+        if (!Files.isRegularFile(path)) {
+            return ResponseEntity.notFound().build();
+        }
+        MediaType type = MediaTypeFactory.getMediaType(path.getFileName().toString())
+                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        return ResponseEntity.ok()
+                .contentType(type)
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(new FileSystemResource(path));
     }
 
     private String getClientIp(HttpServletRequest request) {

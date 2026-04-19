@@ -80,6 +80,12 @@ public class UserNotificationService {
         return notificationRepository.save(notification);
     }
 
+    @Transactional
+    public UserNotificationResponse createNotificationResponse(Long userId, String title, String message,
+                                                               String type, String actionUrl, String icon) {
+        return toResponse(createNotification(userId, title, message, type, actionUrl, icon));
+    }
+
     private PageResponse<UserNotificationResponse> buildPageResponse(Page<UserNotification> page) {
         return PageResponse.<UserNotificationResponse>builder()
                 .content(page.getContent().stream()
